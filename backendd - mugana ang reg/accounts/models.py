@@ -2,12 +2,13 @@ from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseUserManager
 
 class CustomUserManager(BaseUserManager):
-    def create_user(self, email, password=None, **extra_fields):
+    def create_user(self, email, name, password=None):
         if not email:
-            raise ValueError("The Email must be set")
+            raise ValueError("Email is required")
         email = self.normalize_email(email)
-        user = self.model(email=email, **extra_fields)
-        user.set_password(password)
+        user = self.model(email=self.normalize_email(email), name=name)
+        user.set_password(password)  #Hash pass properly
+
         user.save(using=self._db)
         return user
 
@@ -26,6 +27,7 @@ class CustomUserManager(BaseUserManager):
 class CustomUser(AbstractBaseUser, PermissionsMixin):
     email = models.EmailField(unique=True)
     name = models.CharField(max_length=150)
+    password = models.CharField(max_length=255) #store hashed password
     avatar = models.ImageField(upload_to="avatars/", blank=True, null=True)  # Aligning with frontend expectations
     preferences = models.JSONField(default=dict, blank=True)  # Storing user preferences
     

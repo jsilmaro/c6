@@ -11,16 +11,18 @@ from rest_framework.decorators import api_view, permission_classes
 from django.contrib.auth.hashers import check_password
 
 
-
 class RegisterView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)
         if serializer.is_valid():
-            user = serializer.save()
-            refresh = RefreshToken.for_user(user)
+            user = serializer.save(commit=False) #prevent premature saving
+            user.set_password(request.data["password"]) #hash pass correctly
+            
+            user.save() 
 
+            refresh = RefreshToken.for_user(user)
             return Response({
                 "token": str(refresh.access_token),
                 "user": UserSerializer(user).data  # Uses serializer for structured response
@@ -33,33 +35,35 @@ class LoginView(APIView):
         email = request.data.get("email")
         password = request.data.get("password")
 
-        print(f"Received Login Request: email={email}, password={password}")
+        # Debugging: Print received login request
+        print(f"Login Attempt: email={email}, password={password}")
 
         if not email or not password:
             return Response({"error": "Email and password are required."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Step 1: Find user in the database
+        # Verify if user exists
         user = CustomUser.objects.filter(email=email).first()
-        print("User Found:", user)  # Debugging step: Prints user details or None if user isn't found
+        print("User Found:", user)  # Debugging: Should print user details or None
 
-        if not user:
+        if not user or not check_password(password, user.password):
             return Response({"error": "Invalid email or password."}, status=status.HTTP_401_UNAUTHORIZED)
 
-        # Step 2: Verify password matches
-        password_matches = check_password(password, user.password)
-        print("Password Match:", password_matches)  # Debug password validation
-
-        if not password_matches:
-            return Response({"error": "Invalid email or password."}, status=status.HTTP_401_UNAUTHORIZED)
-
-        # Step 3: Generate JWT tokens
         refresh = RefreshToken.for_user(user)
 
         return Response({
             "token": str(refresh.access_token),
+            "refresh_token": str(refresh),
             "user": UserSerializer(user).data
         }, status=status.HTTP_200_OK)
+    
 
+class LogoutView(APIView):
+    def post(self, request):
+        try:
+            return Response({"message": "Logged out successfully"}, status=status.HTTP_200_OK)
+        except:
+            return Response({"error": "Logout failed."}, status=status.HTTP_400_BAD_REQUEST)
+        
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def get_active_accounts(request):

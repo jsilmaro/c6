@@ -18,7 +18,7 @@ class RegisterView(APIView):
         serializer = RegisterSerializer(data=request.data)
         if serializer.is_valid():
             user = serializer.save(commit=False) #prevent premature saving
-            user.set_password(request.data["password"]) #hash pass correctly
+            user.set_password(serializer.validated_data["password"]) #hash pass correctly
             
             user.save() 
 
@@ -35,27 +35,22 @@ class LoginView(APIView):
         email = request.data.get("email")
         password = request.data.get("password")
 
-        # Debugging: Print received login request
-        print(f"Login Attempt: email={email}, password={password}")
-
-        if not email or not password:
-            return Response({"error": "Email and password are required."}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Verify if user exists
         user = CustomUser.objects.filter(email=email).first()
-        print("User Found:", user)  # Debugging: Should print user details or None
+        if not user:
+            return Response({"error": "User does not exist."}, status=status.HTTP_401_UNAUTHORIZED)
 
-        if not user or not check_password(password, user.password):
-            return Response({"error": "Invalid email or password."}, status=status.HTTP_401_UNAUTHORIZED)
+        print(f"Stored Password for {email}: {user.password}")  # Debugging
+        password_matches = check_password(password, user.password)
+        print(f"Password Match: {password_matches}")  # Debugging
+
+        if not password_matches:
+            return Response({"error": "Invalid password."}, status=status.HTTP_401_UNAUTHORIZED)
 
         refresh = RefreshToken.for_user(user)
-
         return Response({
             "token": str(refresh.access_token),
-            "refresh_token": str(refresh),
             "user": UserSerializer(user).data
-        }, status=status.HTTP_200_OK)
-    
+        }, status=status.HTTP_200_OK)    
 
 class LogoutView(APIView):
     def post(self, request):
@@ -78,3 +73,7 @@ def get_active_accounts(request):
         }
     ]
     return Response(active_accounts, status=status.HTTP_200_OK)
+
+
+
+

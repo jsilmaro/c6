@@ -15,12 +15,19 @@ class RegisterView(generics.CreateAPIView):
     serializer_class = UserSerializer
 
     def create(self, request, *args, **kwargs):
-        response = super().create(request, *args, **kwargs)
-        user = CustomUser.objects.get(email=request.data["email"])
-        refresh = RefreshToken.for_user(user)
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
         
+        # Create user with proper password hashing
+        user = CustomUser.objects.create_user(
+            email=request.data["email"],
+            name=request.data["name"],
+            password=request.data["password"]
+        )
+        
+        refresh = RefreshToken.for_user(user)
         return Response({
-            "token": str(refresh.access_token),  # Send JWT token to frontend
+            "token": str(refresh.access_token),
             "user": {
                 "id": user.id,
                 "name": user.name,

@@ -6,8 +6,13 @@ class CustomUserManager(BaseUserManager):
         if not email:
             raise ValueError("Email is required")
         email = self.normalize_email(email)
-        user = self.model(email=self.normalize_email(email), name=name)
-        user.set_password(password)  #Hash pass properly
+        user = self.model(email=email, name=name)
+       
+        if password:
+            user.set_password(password)  #Hash pass properly
+
+        else:
+            raise ValueError("Password is required")
 
         user.save(using=self._db)
         return user
@@ -27,7 +32,6 @@ class CustomUserManager(BaseUserManager):
 class CustomUser(AbstractBaseUser, PermissionsMixin):
     email = models.EmailField(unique=True)
     name = models.CharField(max_length=150)
-    password = models.CharField(max_length=255) #store hashed password
     avatar = models.ImageField(upload_to="avatars/", blank=True, null=True)  # Aligning with frontend expectations
     preferences = models.JSONField(default=dict, blank=True)  # Storing user preferences
     

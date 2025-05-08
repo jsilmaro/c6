@@ -9,6 +9,8 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.decorators import api_view, permission_classes
 from django.contrib.auth.hashers import check_password
+from .models import Transaction, Budget
+from .serializers import TransactionSerializer, BudgetSerializer
 
 
 class RegisterView(APIView):
@@ -77,3 +79,37 @@ def get_active_accounts(request):
 
 
 
+
+
+
+class TransactionView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        # Only get transactions for the logged-in user
+        transactions = Transaction.objects.filter(user=request.user).order_by('-date', '-created_at')
+        serializer = TransactionSerializer(transactions, many=True)
+        return Response(serializer.data)
+
+    def post(self, request):
+        serializer = TransactionSerializer(data=request.data)
+        if serializer.is_valid():
+            # Ensure transaction is tied to current user
+            transaction = serializer.save(user=request.user)
+            # Return the newly created transaction
+            return Response(TransactionSerializer(transaction).data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+class BudgetView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        budgets = Budget.objects.filter(user=request.user).order_by('-start_date')
+        serializer = BudgetSerializer(budgets, many=True)
+        return Response(serializer.data)
+
+    def post(self, request):
+        serializer = BudgetSerializer(data=request.data)
+        if serializer.is_valid():
+            budget = serializer.save(user=request.user)
+            return Response(BudgetSerializer(budget).data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

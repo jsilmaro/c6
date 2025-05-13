@@ -9,7 +9,7 @@ class Transaction(models.Model):
         ('income', 'Income'),
         ('expense', 'Expense')
     ]
-    
+
     EXPENSE_CATEGORIES = [
         ('food', 'Food'),
         ('transportation', 'Transportation'),
@@ -39,26 +39,29 @@ class Transaction(models.Model):
     class Meta:
         ordering = ['-date', '-created_at']
 class Budget(models.Model):
-    BUDGET_PERIODS = [
-        ('monthly', 'Monthly'),
-        ('quarterly', 'Quarterly'),
-        ('annual', 'Annual')
-    ]
-    
-    BUDGET_CATEGORIES = [
+    CATEGORY_CHOICES = [
         ('housing', 'Housing'),
         ('food', 'Food'),
         ('transportation', 'Transportation'),
         ('utilities', 'Utilities'),
         ('entertainment', 'Entertainment'),
         ('shopping', 'Shopping'),
+        ('health', 'Health'),
+        ('business', 'Business'),
+        ('investment', 'Investment'),
+        ('gift', 'Gift'),
         ('other', 'Other')
     ]
-    
+    PERIOD_CHOICES = [
+        ('monthly', 'Monthly'),
+        ('quarterly', 'Quarterly'),
+        ('annual', 'Annual')
+    ]
+
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='budgets')
-    category = models.CharField(max_length=20, choices=BUDGET_CATEGORIES)
-    period = models.CharField(max_length=10, choices=BUDGET_PERIODS, default='monthly')
+    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
+    period = models.CharField(max_length=10, choices=PERIOD_CHOICES, default='monthly')
     start_date = models.DateField()
     end_date = models.DateField()
     created_at = models.DateTimeField(auto_now_add=True)

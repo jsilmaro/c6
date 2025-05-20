@@ -3,7 +3,7 @@ from .models import CustomUser
 from api.models import Transaction, Budget
 
 class CustomUserAdmin(admin.ModelAdmin):
-    list_display = ["id", "email", "name", "is_active", "is_staff"]
+    list_display = ["id", "email", "name", "avatar", "preferences", "is_active", "is_staff"]
     search_fields = ["email", "name"]
 
 class TransactionAdmin(admin.ModelAdmin):

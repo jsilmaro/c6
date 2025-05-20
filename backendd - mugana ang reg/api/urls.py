@@ -5,6 +5,8 @@ from .views import TransactionView, BudgetView, ReportsView, RegisterView, Login
 from accounts.views import (
     update_profile, change_password, update_preferences
 )
+from django.conf import settings
+from django.conf.urls.static import static
 
 urlpatterns = [
     path("auth/register/", RegisterView.as_view(), name="register"),
@@ -27,4 +29,4 @@ urlpatterns = [
     
     # Reports endpoints
     path("reports/<str:report_type>/", ReportsView.as_view(), name="reports"),
-]
+] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

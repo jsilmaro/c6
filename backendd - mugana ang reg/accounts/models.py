@@ -32,7 +32,7 @@ class CustomUserManager(BaseUserManager):
 class CustomUser(AbstractBaseUser, PermissionsMixin):
     email = models.EmailField(unique=True)
     name = models.CharField(max_length=150)
-    avatar = models.ImageField(upload_to="avatars/", blank=True, null=True)  # Aligning with frontend expectations
+    avatar = models.ImageField(upload_to="avatars/", null=True, blank=True)  # Aligning with frontend expectations
     preferences = models.JSONField(default=dict, blank=True)  # Storing user preferences
     
     is_active = models.BooleanField(default=True)

@@ -1,7 +1,7 @@
 
 from django.urls import path
 from rest_framework_simplejwt.views import TokenRefreshView
-from .views import TransactionView, BudgetView, ReportsView, RegisterView, LoginView, LogoutView, get_active_accounts
+from .views import TransactionView, BudgetView, ReportsView, RegisterView, LoginView, LogoutView, get_active_accounts, dashboard_summary
 from accounts.views import (
     update_profile, change_password, update_preferences
 )
@@ -9,6 +9,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 
 urlpatterns = [
+    path('dashboard/summary/', dashboard_summary, name='dashboard-summary'),
     path("auth/register/", RegisterView.as_view(), name="register"),
     path("auth/login/", LoginView.as_view(), name="login"),
     path("auth/logout/", LogoutView.as_view(), name="logout"),

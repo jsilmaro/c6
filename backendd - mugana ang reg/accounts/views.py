@@ -157,9 +157,24 @@ def change_password(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def update_preferences(request):
+    VALID_CURRENCIES = ['USD', 'EUR', 'GBP', 'JPY', 'CAD']
+
     user = request.user
-    user.preferences.update(request.data)
+    data = request.data
+
+    if 'currency' in data and data['currency'] not in VALID_CURRENCIES:
+        return Response({'error': 'Invalid currency'}, status=400)
+
+    preferences = {
+        'currency': data.get('currency', user.preferences.get('currency', 'USD')),
+        'email_alerts': data.get('email_alerts', user.preferences.get('email_alerts', True)),
+        'weekly_reports': data.get('weekly_reports', user.preferences.get('weekly_reports', False)),
+        'budget_alerts': data.get('budget_alerts', user.preferences.get('budget_alerts', True))
+    }
+
+    user.preferences = preferences
     user.save()
+
     return Response(user.preferences)
 
 @api_view(['POST'])
@@ -191,47 +206,100 @@ def change_password(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def update_preferences(request):
+    VALID_CURRENCIES = ['USD', 'EUR', 'GBP', 'JPY', 'CAD']
     user = request.user
-    user.preferences.update(request.data)
+    data = request.data
+    
+    if 'currency' in data and data['currency'] not in VALID_CURRENCIES:
+        return Response({'error': 'Invalid currency'}, status=400)
+        
+    preferences = user.preferences or {}
+    
+    # Update only provided fields
+    if 'currency' in data:
+        preferences['currency'] = data['currency']
+    if 'email_alerts' in data:
+        preferences['email_alerts'] = data['email_alerts']
+    if 'weekly_reports' in data:
+        preferences['weekly_reports'] = data['weekly_reports']
+    if 'budget_alerts' in data:
+        preferences['budget_alerts'] = data['budget_alerts']
+    
+    user.preferences = preferences
     user.save()
-    return Response(user.preferences)
+    
+    # Return complete user data to update frontend state
+    return Response({
+        'message': 'Preferences updated successfully',
+        'preferences': user.preferences,
+        'user': UserSerializer(user).data,
+        'success': True
+    })
 
 
 
 @api_view(["PUT"])
 @permission_classes([IsAuthenticated])
+@parser_classes([MultiPartParser, FormParser])
 def update_profile(request):
-    user = request.user
-    data = request.data
+    try:
+        user = request.user
+        data = request.data
 
-    # Update email and username
-    if "email" in data:
-        user.email = data["email"]
-    if "name" in data:
-        user.name = data["name"]
+        if "email" in data:
+            user.email = data["email"]
+        if "name" in data:
+            user.name = data["name"]
 
-    # Handle avatar upload/removal
-    if "avatar" in request.FILES:
-        user.avatar = request.FILES["avatar"]
-    elif data.get("remove_avatar"):
-        user.avatar = None  # Remove avatar
+        if "avatar" in request.FILES:
+            user.avatar = request.FILES["avatar"]
+        elif data.get("remove_avatar") == "true":
+            user.avatar = None
 
-    user.save()
-    return Response(UserSerializer(user).data, status=status.HTTP_200_OK)
+        user.save()
+        
+        return Response({
+            "message": "Profile updated successfully",
+            "user": UserSerializer(user).data,
+            "avatar_url": user.avatar.url if user.avatar else None,
+            "success": True
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        return Response({
+            "error": "Failed to update profile",
+            "detail": str(e),
+            "success": False
+        }, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def change_password(request):
     user = request.user
-    old_password = request.data.get('old_password')
+    current_password = request.data.get('current_password')
     new_password = request.data.get('new_password')
-    
-    if not check_password(old_password, user.password):
-        return Response({'error': 'Invalid old password'}, status=status.HTTP_400_BAD_REQUEST)
-    
+
+    if not current_password or not new_password:
+        return Response({
+            'error': 'Both current and new password are required'
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    # Use authenticate to verify current password
+    if not authenticate(email=user.email, password=current_password):
+        return Response({
+            'error': 'Current password is incorrect'
+        }, status=status.HTTP_400_BAD_REQUEST)
+
     user.set_password(new_password)
     user.save()
-    return Response({'message': 'Password updated successfully'})
+    
+    # Generate new token after password change
+    refresh = RefreshToken.for_user(user)
+    return Response({
+        'message': 'Password updated successfully',
+        'token': str(refresh.access_token),
+        'success': True
+    }, status=status.HTTP_200_OK)
 
 @api_view(["PUT"])
 @permission_classes([IsAuthenticated])
@@ -252,4 +320,3 @@ def update_preferences(request):
 
     user.save()
     return Response(user.preferences)
-

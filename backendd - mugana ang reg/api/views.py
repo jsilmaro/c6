@@ -18,10 +18,22 @@ class RegisterView(APIView):
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)
         if serializer.is_valid():
-            user = serializer.save(commit=False) #prevent premature saving
-            user.set_password(serializer.validated_data["password"]) #hash pass correctly
-
-            user.save() 
+            user = serializer.save(commit=False)
+            user.set_password(serializer.validated_data["password"])
+            
+            # Initialize clean preferences
+            user.preferences = {
+                "currency": "USD",
+                "email_alerts": True,
+                "weekly_reports": False,
+                "budget_alerts": True
+            }
+            
+            user.save()
+            
+            # Ensure no transactions exist for new user
+            Transaction.objects.filter(user=user).delete()
+            Budget.objects.filter(user=user).delete() 
 
             refresh = RefreshToken.for_user(user)
             return Response({
@@ -239,3 +251,83 @@ class ReportsView(APIView):
             return self.export_pdf(data, filename)
 
         return Response(data)
+from datetime import datetime, timedelta
+from dateutil.relativedelta import relativedelta
+from django.db.models import Sum, Q
+from django.utils import timezone
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def dashboard_summary(request):
+    user = request.user
+    today = timezone.now()
+    first_day_of_month = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    last_month = first_day_of_month - relativedelta(months=1)
+    
+    # Current month transactions
+    monthly_transactions = Transaction.objects.filter(
+        user=user,
+        date__gte=first_day_of_month,
+        date__lte=today
+    )
+    
+    # Last month transactions for comparison
+    last_month_transactions = Transaction.objects.filter(
+        user=user,
+        date__gte=last_month,
+        date__lt=first_day_of_month
+    )
+    
+    # Calculate current month totals
+    total_income = monthly_transactions.filter(type='income').aggregate(Sum('amount'))['amount__sum'] or 0
+    total_expenses = monthly_transactions.filter(type='expense').aggregate(Sum('amount'))['amount__sum'] or 0
+    balance = total_income - total_expenses
+    
+    # Calculate monthly change percentage
+    last_month_total = (
+        last_month_transactions.filter(type='income').aggregate(Sum('amount'))['amount__sum'] or 0
+    ) - (
+        last_month_transactions.filter(type='expense').aggregate(Sum('amount'))['amount__sum'] or 0
+    )
+    
+    monthly_change = 0
+    if last_month_total != 0:
+        monthly_change = ((balance - last_month_total) / abs(last_month_total)) * 100
+    
+    # Get expenses by category
+    expenses_by_category = monthly_transactions.filter(
+        type='expense'
+    ).values('category').annotate(
+        amount=Sum('amount')
+    ).order_by('-amount')
+    
+    # Get recent transactions
+    recent_transactions = Transaction.objects.filter(
+        user=user
+    ).order_by('-date', '-created_at')[:5]
+    
+    # Calculate spending over time (last 6 months)
+    spending_over_time = []
+    for i in range(5, -1, -1):
+        month_date = (today - relativedelta(months=i))
+        month_transactions = Transaction.objects.filter(
+            user=user,
+            date__year=month_date.year,
+            date__month=month_date.month
+        )
+        
+        spending_over_time.append({
+            'date': month_date.strftime('%b'),
+            'income': month_transactions.filter(type='income').aggregate(Sum('amount'))['amount__sum'] or 0,
+            'expenses': month_transactions.filter(type='expense').aggregate(Sum('amount'))['amount__sum'] or 0
+        })
+    
+    return Response({
+        'totalIncome': total_income,
+        'totalExpenses': total_expenses,
+        'balance': balance,
+        'monthlyChange': 0,  # Calculate this based on previous month if needed
+        'expensesByCategory': expenses_by_category,
+        'recentTransactions': TransactionSerializer(recent_transactions, many=True).data,
+        'spendingOverTime': spending_over_time
+    })
